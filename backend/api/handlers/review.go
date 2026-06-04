@@ -1,7 +1,9 @@
+// api/handlers/review.go (partial - key functions)
 package handlers
 
 import (
 	"net/http"
+	"strconv"
 
 	"backend/api/models"
 	"backend/api/services"
@@ -10,8 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// CreateReview godoc
-// POST /api/v1/reviews
+// CreateReview handler
 func CreateReview(c *gin.Context) {
 	userID := c.GetString("user_id")
 
@@ -23,43 +24,42 @@ func CreateReview(c *gin.Context) {
 
 	review, err := services.CreateReview(userID, req)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
+		utils.ErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	utils.SuccessResponse(c, http.StatusCreated, "review submitted successfully, it will appear after approval", review)
+	utils.SuccessResponse(c, http.StatusCreated, "review created successfully", review)
 }
 
-// GetProductReviews godoc
-// GET /api/v1/reviews/:product_id
+// GetProductReviews handler
 func GetProductReviews(c *gin.Context) {
 	productID := c.Param("product_id")
-	if productID == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, "missing product id")
-		return
-	}
 
-	reviews, err := services.GetReviewsByProductID(productID)
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	reviews, total, err := services.GetReviewsByProductID(productID, limit, offset)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	utils.SuccessResponse(c, http.StatusOK, "", reviews)
+	utils.SuccessResponse(c, http.StatusOK, "", gin.H{
+		"reviews": reviews,
+		"total":   total,
+		"limit":   limit,
+		"offset":  offset,
+	})
 }
 
-// DeleteReview godoc
-// DELETE /api/v1/reviews/:id
+// DeleteReview handler
 func DeleteReview(c *gin.Context) {
-	userID := c.GetString("user_id")
 	reviewID := c.Param("id")
+	userID := c.GetString("user_id")
+	role := c.GetString("user_role")
 
-	if reviewID == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, "missing review id")
-		return
-	}
-
-	if err := services.DeleteReview(reviewID, userID); err != nil {
+	err := services.DeleteReview(reviewID, userID, role)
+	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -67,42 +67,34 @@ func DeleteReview(c *gin.Context) {
 	utils.SuccessResponse(c, http.StatusOK, "review deleted successfully", nil)
 }
 
-// GetPendingReviews godoc
-// GET /api/v1/admin/reviews/pending
+// GetPendingReviews handler (admin only)
 func GetPendingReviews(c *gin.Context) {
-	reviews, err := services.GetPendingReviews()
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	reviews, total, err := services.GetPendingReviews(limit, offset)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	utils.SuccessResponse(c, http.StatusOK, "", reviews)
+	utils.SuccessResponse(c, http.StatusOK, "", gin.H{
+		"reviews": reviews,
+		"total":   total,
+		"limit":   limit,
+		"offset":  offset,
+	})
 }
 
-// ApproveReview godoc
-// PATCH /api/v1/admin/reviews/:id/approve
+// ApproveReview handler (admin only)
 func ApproveReview(c *gin.Context) {
 	reviewID := c.Param("id")
-	if reviewID == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, "missing review id")
-		return
-	}
 
-	var req models.UpdateReviewRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	err := services.ApproveReview(reviewID)
+	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	if err := services.ApproveReview(reviewID, req.IsApproved); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	message := "review approved successfully"
-	if !req.IsApproved {
-		message = "review rejected successfully"
-	}
-
-	utils.SuccessResponse(c, http.StatusOK, message, nil)
+	utils.SuccessResponse(c, http.StatusOK, "review approved successfully", nil)
 }

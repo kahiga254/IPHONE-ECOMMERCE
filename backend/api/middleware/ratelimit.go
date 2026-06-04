@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adams/applestore-backend/pkg/utils"
+	"backend/pkg/utils"
 	"github.com/gin-gonic/gin"
 )
 

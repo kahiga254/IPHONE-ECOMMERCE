@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 
 	"backend/api/models"
 	"backend/api/services"
@@ -107,13 +108,25 @@ func DeleteProduct(c *gin.Context) {
 // GetAllCategories godoc
 // GET /api/v1/categories
 func GetAllCategories(c *gin.Context) {
-	categories, err := services.GetAllCategories()
+	// Get pagination params from query
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+
+	categories, total, err := services.GetAllCategories(page, limit)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	utils.SuccessResponse(c, http.StatusOK, "", categories)
+	totalPages := (total + limit - 1) / limit
+
+	utils.SuccessResponse(c, http.StatusOK, "", gin.H{
+		"categories":  categories,
+		"total":       total,
+		"page":        page,
+		"limit":       limit,
+		"total_pages": totalPages,
+	})
 }
 
 // CreateCategory godoc

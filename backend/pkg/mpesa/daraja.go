@@ -14,7 +14,7 @@ import (
 
 // baseURL returns the correct Daraja base URL based on the environment
 func baseURL() string {
-	if config.App.MpesaEnv == "production" {
+	if config.App.MPesaEnvironment == "production" {
 		return "https://api.safaricom.co.ke"
 	}
 	return "https://sandbox.safaricom.co.ke"
@@ -32,7 +32,7 @@ func GetAccessToken() (string, error) {
 
 	// Base64 encode consumer key and secret
 	credentials := base64.StdEncoding.EncodeToString(
-		[]byte(config.App.MpesaConsumerKey + ":" + config.App.MpesaConsumerSecret),
+		[]byte(config.App.MPesaConsumerKey + ":" + config.App.MPesaConsumerSecret),
 	)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -68,7 +68,7 @@ func GetAccessToken() (string, error) {
 // GeneratePassword generates the Daraja STK push password
 // It is a base64 encoding of ShortCode + Passkey + Timestamp
 func GeneratePassword(timestamp string) string {
-	raw := config.App.MpesaShortCode + config.App.MpesaPasskey + timestamp
+	raw := config.App.MPesaShortcode + config.App.MPesaPasskey + timestamp
 	return base64.StdEncoding.EncodeToString([]byte(raw))
 }
 

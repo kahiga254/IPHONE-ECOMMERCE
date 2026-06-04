@@ -40,15 +40,15 @@ func InitiateSTKPush(phone string, amount float64, orderNumber string) (*models.
 
 	// Build the STK push payload
 	payload := stkPushRequest{
-		BusinessShortCode: config.App.MpesaShortCode,
+		BusinessShortCode: config.App.MPesaShortcode,
 		Password:          password,
 		Timestamp:         timestamp,
 		TransactionType:   "CustomerPayBillOnline",
 		Amount:            int(amount), // Daraja requires whole numbers
 		PartyA:            phone,
-		PartyB:            config.App.MpesaShortCode,
+		PartyB:            config.App.MPesaShortcode,
 		PhoneNumber:       phone,
-		CallBackURL:       config.App.MpesaCallbackURL,
+		CallBackURL:       config.App.MPesaCallbackURL,
 		AccountReference:  orderNumber,
 		TransactionDesc:   "Payment for order " + orderNumber,
 	}
@@ -106,7 +106,7 @@ func QuerySTKStatus(checkoutRequestID string) (*models.MpesaQueryResponse, error
 
 	// Build the query payload
 	payload := map[string]string{
-		"BusinessShortCode": config.App.MpesaShortCode,
+		"BusinessShortCode": config.App.MPesaShortcode,
 		"Password":          password,
 		"Timestamp":         timestamp,
 		"CheckoutRequestID": checkoutRequestID,

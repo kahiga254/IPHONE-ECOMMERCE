@@ -109,20 +109,38 @@ func DeleteProduct(id string) error {
 	return repository.DeleteProduct(id)
 }
 
-// GetAllCategories fetches all product categories
-func GetAllCategories() ([]models.Category, error) {
-	categories, err := repository.GetAllCategories()
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch categories: %w", err)
+// GetAllCategories fetches all product categories with pagination
+// GetAllCategories fetches all product categories with pagination
+func GetAllCategories(page, limit int) ([]models.Category, int, error) {
+	if page < 1 {
+		page = 1
 	}
-	return categories, nil
+	if limit < 1 {
+		limit = 10
+	}
+
+	offset := (page - 1) * limit
+	categories, total, err := repository.GetAllCategories(limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to fetch categories: %w", err)
+	}
+	return categories, total, nil
 }
 
 // CreateCategory validates and creates a new category
 func CreateCategory(req models.CreateCategoryRequest) (*models.Category, error) {
 	req.Slug = normalizeSlug(req.Slug)
 
-	category, err := repository.CreateCategory(req)
+	// Convert CreateCategoryRequest to Category model
+	category := &models.Category{
+		Name:        req.Name,
+		Slug:        req.Slug,
+		Description: req.Description,
+		ImageURL:    req.ImageURL,
+		ParentID:    req.ParentID,
+	}
+
+	err := repository.CreateCategory(category)
 	if err != nil {
 		if strings.Contains(err.Error(), "unique") {
 			return nil, fmt.Errorf("a category with this slug already exists")
@@ -143,11 +161,24 @@ func UpdateCategory(id string, req models.UpdateCategoryRequest) error {
 		return fmt.Errorf("category not found")
 	}
 
+	// Update only provided fields
+	if req.Name != "" {
+		existing.Name = req.Name
+	}
 	if req.Slug != "" {
-		req.Slug = normalizeSlug(req.Slug)
+		existing.Slug = normalizeSlug(req.Slug)
+	}
+	if req.Description != "" {
+		existing.Description = req.Description
+	}
+	if req.ImageURL != "" {
+		existing.ImageURL = req.ImageURL
+	}
+	if req.ParentID != nil {
+		existing.ParentID = req.ParentID
 	}
 
-	return repository.UpdateCategory(id, req)
+	return repository.UpdateCategory(id, existing)
 }
 
 // DeleteCategory deletes a category by ID
