@@ -203,3 +203,15 @@ func normalizeSlug(slug string) string {
 	slug = strings.ReplaceAll(slug, " ", "-")
 	return slug
 }
+
+func ToggleProductStatus(id string, isActive bool) error {
+	existing, err := repository.GetProductByID(id)
+	if err != nil {
+		return fmt.Errorf("failed to fetch product: %w", err)
+	}
+	if existing == nil {
+		return fmt.Errorf("product not found")
+	}
+
+	return repository.UpdateProductStatus(id, isActive)
+}

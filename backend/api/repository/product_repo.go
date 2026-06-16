@@ -306,3 +306,15 @@ func GetVariantByID(id string) (*models.Variant, error) {
 	json.Unmarshal(imagesJSON, &v.Images)
 	return &v, nil
 }
+
+func UpdateProductStatus(id string, isActive bool) error {
+	_, err := database.DB.Exec(`
+		UPDATE products SET is_active = $1, updated_at = NOW()
+		WHERE id = $2`,
+		isActive, id,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update product status: %w", err)
+	}
+	return nil
+}

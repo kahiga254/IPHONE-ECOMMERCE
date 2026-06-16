@@ -118,6 +118,7 @@ func main() {
 		admin.POST("/products", handlers.CreateProduct)
 		admin.PUT("/products/:id", handlers.UpdateProduct)
 		admin.DELETE("/products/:id", handlers.DeleteProduct)
+		admin.PATCH("/products/:id/status", handlers.ToggleProductStatus)
 
 		// Categories
 		admin.POST("/categories", handlers.CreateCategory)

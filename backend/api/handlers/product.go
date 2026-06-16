@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
 	"backend/api/models"
 	"backend/api/services"
@@ -11,16 +10,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetAllProducts godoc
-// GET /api/v1/products
 func GetAllProducts(c *gin.Context) {
-	var q models.ProductFilterQuery
-	if err := c.ShouldBindQuery(&q); err != nil {
+	var query models.ProductFilterQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	result, err := services.GetAllProducts(q)
+	// services.GetAllProducts returns (products, error) - 2 values
+	result, err := services.GetAllProducts(query)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
@@ -29,12 +27,10 @@ func GetAllProducts(c *gin.Context) {
 	utils.SuccessResponse(c, http.StatusOK, "", result)
 }
 
-// GetProduct godoc
-// GET /api/v1/products/:slug
 func GetProduct(c *gin.Context) {
 	slug := c.Param("slug")
 	if slug == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, "missing product slug")
+		utils.ErrorResponse(c, http.StatusBadRequest, "slug required")
 		return
 	}
 
@@ -47,8 +43,6 @@ func GetProduct(c *gin.Context) {
 	utils.SuccessResponse(c, http.StatusOK, "", product)
 }
 
-// CreateProduct godoc
-// POST /api/v1/admin/products
 func CreateProduct(c *gin.Context) {
 	var req models.CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -58,19 +52,17 @@ func CreateProduct(c *gin.Context) {
 
 	product, err := services.CreateProduct(req)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
+		utils.ErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	utils.SuccessResponse(c, http.StatusCreated, "product created successfully", product)
 }
 
-// UpdateProduct godoc
-// PUT /api/v1/admin/products/:id
 func UpdateProduct(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, "missing product id")
+		utils.ErrorResponse(c, http.StatusBadRequest, "product id required")
 		return
 	}
 
@@ -80,109 +72,51 @@ func UpdateProduct(c *gin.Context) {
 		return
 	}
 
-	if err := services.UpdateProduct(id, req); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
+	err := services.UpdateProduct(id, req)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	utils.SuccessResponse(c, http.StatusOK, "product updated successfully", nil)
 }
 
-// DeleteProduct godoc
-// DELETE /api/v1/admin/products/:id
 func DeleteProduct(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, "missing product id")
+		utils.ErrorResponse(c, http.StatusBadRequest, "product id required")
 		return
 	}
 
-	if err := services.DeleteProduct(id); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
+	err := services.DeleteProduct(id)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	utils.SuccessResponse(c, http.StatusOK, "product deleted successfully", nil)
 }
 
-// GetAllCategories godoc
-// GET /api/v1/categories
-func GetAllCategories(c *gin.Context) {
-	// Get pagination params from query
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+func ToggleProductStatus(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		utils.ErrorResponse(c, http.StatusBadRequest, "product id required")
+		return
+	}
 
-	categories, total, err := services.GetAllCategories(page, limit)
+	var req struct {
+		IsActive bool `json:"is_active"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	err := services.ToggleProductStatus(id, req.IsActive)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	totalPages := (total + limit - 1) / limit
-
-	utils.SuccessResponse(c, http.StatusOK, "", gin.H{
-		"categories":  categories,
-		"total":       total,
-		"page":        page,
-		"limit":       limit,
-		"total_pages": totalPages,
-	})
-}
-
-// CreateCategory godoc
-// POST /api/v1/admin/categories
-func CreateCategory(c *gin.Context) {
-	var req models.CreateCategoryRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	category, err := services.CreateCategory(req)
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	utils.SuccessResponse(c, http.StatusCreated, "category created successfully", category)
-}
-
-// UpdateCategory godoc
-// PUT /api/v1/admin/categories/:id
-func UpdateCategory(c *gin.Context) {
-	id := c.Param("id")
-	if id == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, "missing category id")
-		return
-	}
-
-	var req models.UpdateCategoryRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	if err := services.UpdateCategory(id, req); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	utils.SuccessResponse(c, http.StatusOK, "category updated successfully", nil)
-}
-
-// DeleteCategory godoc
-// DELETE /api/v1/admin/categories/:id
-func DeleteCategory(c *gin.Context) {
-	id := c.Param("id")
-	if id == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, "missing category id")
-		return
-	}
-
-	if err := services.DeleteCategory(id); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	utils.SuccessResponse(c, http.StatusOK, "category deleted successfully", nil)
+	utils.SuccessResponse(c, http.StatusOK, "product status updated", nil)
 }
