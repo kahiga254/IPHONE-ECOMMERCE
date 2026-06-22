@@ -42,6 +42,16 @@ export default function ProductsPage() {
     }
   };
 
+  const getProductImage = (product: any) => {
+    if (product.variants && product.variants.length > 0) {
+      const images = product.variants[0].images;
+      if (images && images.length > 0) {
+        return images[0];
+      }
+    }
+    return null;
+  };
+
   const fetchProducts = async () => {
     setLoading(true);
     try {
@@ -56,6 +66,7 @@ export default function ProductsPage() {
       if (filters.order) params.append('order', filters.order);
       
       const response = await api.get(`/products?${params.toString()}`);
+      console.log('Products data:', response.data.data.data);
       setProducts(response.data.data.data || []);
       setPagination({
         ...pagination,
@@ -73,7 +84,6 @@ export default function ProductsPage() {
     setFilters({ ...filters, [key]: value });
     setPagination({ ...pagination, page: 1 });
     
-    // Update URL
     const params = new URLSearchParams();
     Object.keys({ ...filters, [key]: value }).forEach((k) => {
       if (k !== 'page' && (filters as any)[k]) {
@@ -111,7 +121,7 @@ export default function ProductsPage() {
     return (
       <>
         <Navbar />
-        <div className="max-w-7xl mx-auto px-4 py-16 text-center">Loading...</div>
+        <div className="max-w-7xl mx-auto px-4 py-16 text-center text-black">Loading...</div>
       </>
     );
   }
@@ -200,7 +210,7 @@ export default function ProductsPage() {
                 <p className="text-gray-500">No products found</p>
                 <button
                   onClick={clearFilters}
- className="mt-4 text-blue-600 hover:underline"
+                  className="mt-4 text-blue-600 hover:underline"
                 >
                   Clear filters
                 </button>
@@ -208,22 +218,41 @@ export default function ProductsPage() {
             ) : (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {products.map((product: any) => (
-                    <div key={product.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition">
-                      <div className="p-4">
-                        <h3 className="font-semibold text-lg mb-2">{product.name}</h3>
-                        <p className="text-blue-600 font-bold text-xl">
-                          KSh {product.base_price?.toLocaleString()}
-                        </p>
-                        <Link 
-                          href={`/products/${product.slug}`}
-                          className="bg-black text-white block text-center py-2 rounded-full mt-4 text-sm hover:bg-gray-800"
-                        >
-                          View Details
-                        </Link>
+                  {products.map((product: any) => {
+                    const image = getProductImage(product);
+                    return (
+                      <div key={product.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition">
+                        <div className="p-4">
+                          {/* Product Image */}
+                          <div className="bg-gray-100 rounded-lg h-48 flex items-center justify-center mb-3">
+                            {image ? (
+                              <img
+                                src={image}
+                                alt={product.name}
+                                className="w-full h-48 object-contain"
+                                onError={(e) => {
+                                  console.error('Image load error:', image);
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="text-6xl">📱</div>
+                            )}
+                          </div>
+                          <h3 className="font-semibold text-lg mb-2 text-black">{product.name}</h3>
+                          <p className="text-blue-600 font-bold text-xl">
+                            KSh {product.base_price?.toLocaleString()}
+                          </p>
+                          <Link 
+                            href={`/products/${product.slug}`}
+                            className="bg-black text-white block text-center py-2 rounded-full mt-4 text-sm hover:bg-gray-800"
+                          >
+                            View Details
+                          </Link>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Pagination */}

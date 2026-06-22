@@ -16,32 +16,24 @@ interface CartItem {
   variant: string;
 }
 
-interface Address {
-  id: string;
-  full_name: string;
-  phone: string;
-  street: string;
-  county: string;
-  town: string;
-  is_default: boolean;
-}
-
 export default function CheckoutPage() {
   const router = useRouter();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [selectedAddress, setSelectedAddress] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('mpesa');
   const [mpesaPhone, setMpesaPhone] = useState('');
+  const [isGuest, setIsGuest] = useState(true);
+  const [guestInfo, setGuestInfo] = useState({
+    full_name: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    county: ''
+  });
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
     loadData();
   }, []);
 
@@ -52,18 +44,24 @@ export default function CheckoutPage() {
         const items = JSON.parse(savedCart);
         setCartItems(items);
       }
-
-      const response = await api.get('/addresses');
-      const addressData = response.data.data || [];
-      setAddresses(addressData);
       
-      const defaultAddr = addressData.find((addr: Address) => addr.is_default);
-      if (defaultAddr) {
-        setSelectedAddress(defaultAddr.id);
-        setMpesaPhone(defaultAddr.phone);
-      } else if (addressData.length > 0) {
-        setSelectedAddress(addressData[0].id);
-        setMpesaPhone(addressData[0].phone);
+      // Check if user is logged in
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        setIsGuest(false);
+        try {
+          const response = await api.get('/auth/me');
+          const user = response.data.data;
+          setGuestInfo({
+            ...guestInfo,
+            full_name: user.name || '',
+            email: user.email || '',
+            phone: user.phone || '',
+          });
+        } catch (error) {
+          console.log('User not logged in');
+          setIsGuest(true);
+        }
       }
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -82,58 +80,60 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (!selectedAddress) {
-      toast.error('Please select a shipping address');
-      return;
-    }
-
     if (paymentMethod === 'mpesa' && !mpesaPhone) {
       toast.error('Please enter M-Pesa phone number');
       return;
     }
 
+    if (isGuest) {
+      if (!guestInfo.full_name || !guestInfo.email || !guestInfo.phone || !guestInfo.address) {
+        toast.error('Please fill in all guest details');
+        return;
+      }
+    }
+
     setProcessing(true);
 
     try {
-      const token = localStorage.getItem('access_token');
-      
-      // Create order first
       const orderData = {
         items: cartItems.map(item => ({
           variant_id: item.id,
           quantity: item.quantity,
           price: item.price
         })),
-        address_id: selectedAddress,
         subtotal: subtotal,
         shipping_fee: shipping,
         total: total,
-        payment_method: paymentMethod
+        payment_method: paymentMethod,
+        is_guest: isGuest,
+        guest_info: isGuest ? guestInfo : null,
+        phone: mpesaPhone
       };
 
-      const orderResponse = await api.post('/orders', orderData);
-      const order = orderResponse.data.data;
+      const response = await api.post('/orders/guest', orderData);
+      const order = response.data.data;
       
       if (paymentMethod === 'mpesa') {
         // Initiate M-Pesa payment
-        const paymentResponse = await api.post('/payments/mpesa/stkpush', {
-          order_id: order.id,
-          phone_number: mpesaPhone,
-          amount: total
-        });
+        const paymentResponse = await api.post(
+          isGuest ? '/payments/mpesa/guest/stkpush' : '/payments/mpesa/stkpush',
+          {
+            order_id: order.id,
+            phone: mpesaPhone,
+            amount: total,
+            is_guest: isGuest
+        }
+      );
         
         if (paymentResponse.data.success) {
           toast.success('Payment initiated! Check your phone for M-Pesa prompt');
-          // Clear cart
           localStorage.removeItem('cart');
-          // Redirect to order confirmation
-          router.push(`/orders/${order.id}?payment=pending`);
+          router.push(`/orders/${order.id}?payment=processing`);
         } else {
-          toast.error('Payment initiation failed');
+          toast.error(paymentResponse.data.error || 'Payment initiation failed');
         }
       } else {
-        // Cash on delivery
-        toast.success('Order placed successfully! You will pay on delivery');
+        toast.success('Order placed successfully!');
         localStorage.removeItem('cart');
         router.push(`/orders/${order.id}`);
       }
@@ -168,8 +168,6 @@ export default function CheckoutPage() {
     );
   }
 
-  const selectedAddressObj = addresses.find(a => a.id === selectedAddress);
-
   return (
     <>
       <Navbar />
@@ -178,46 +176,65 @@ export default function CheckoutPage() {
 
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
-            {/* Shipping Address */}
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h2 className="text-xl font-bold text-black mb-4">Shipping Address</h2>
-              
-              {addresses.length === 0 ? (
-                <div className="text-center py-4">
-                  <p className="text-gray-600 mb-3">No addresses saved</p>
-                  <Link href="/addresses" className="text-blue-600 hover:underline">
-                    Add New Address →
-                  </Link>
+            {/* Guest Checkout Form */}
+            {isGuest && (
+              <div className="bg-white rounded-xl shadow-md p-6">
+                <h2 className="text-xl font-bold text-black mb-4">Guest Details</h2>
+                <div className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <input
+                      type="text"
+                      placeholder="Full Name *"
+                      value={guestInfo.full_name}
+                      onChange={(e) => setGuestInfo({ ...guestInfo, full_name: e.target.value })}
+                      className="w-full px-4 py-2 border rounded-lg text-black"
+                    />
+                    <input
+                      type="email"
+                      placeholder="Email *"
+                      value={guestInfo.email}
+                      onChange={(e) => setGuestInfo({ ...guestInfo, email: e.target.value })}
+                      className="w-full px-4 py-2 border rounded-lg text-black"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Phone Number *"
+                    value={guestInfo.phone}
+                    onChange={(e) => setGuestInfo({ ...guestInfo, phone: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg text-black"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Delivery Address *"
+                    value={guestInfo.address}
+                    onChange={(e) => setGuestInfo({ ...guestInfo, address: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg text-black"
+                  />
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <input
+                      type="text"
+                      placeholder="City"
+                      value={guestInfo.city}
+                      onChange={(e) => setGuestInfo({ ...guestInfo, city: e.target.value })}
+                      className="w-full px-4 py-2 border rounded-lg text-black"
+                    />
+                    <input
+                      type="text"
+                      placeholder="County"
+                      value={guestInfo.county}
+                      onChange={(e) => setGuestInfo({ ...guestInfo, county: e.target.value })}
+                      className="w-full px-4 py-2 border rounded-lg text-black"
+                    />
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    <Link href="/login" className="text-blue-600 hover:underline">
+                      Already have an account? Login here →
+                    </Link>
+                  </p>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {addresses.map((addr) => (
-                    <label key={addr.id} className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                      <input
-                        type="radio"
-                        name="address"
-                        value={addr.id}
-                        checked={selectedAddress === addr.id}
-                        onChange={(e) => {
-                          setSelectedAddress(e.target.value);
-                          setMpesaPhone(addr.phone);
-                        }}
-                        className="mt-1 cursor-pointer"
-                      />
-                      <div>
-                        <p className="font-medium text-black">{addr.full_name}</p>
-                        <p className="text-sm text-gray-600">{addr.street}</p>
-                        <p className="text-sm text-gray-600">{addr.town}, {addr.county}</p>
-                        <p className="text-sm text-gray-600">Phone: {addr.phone}</p>
-                      </div>
-                    </label>
-                  ))}
-                  <Link href="/addresses" className="text-blue-600 hover:underline text-sm inline-block mt-2">
-                    + Add New Address
-                  </Link>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Payment Method */}
             <div className="bg-white rounded-xl shadow-md p-6">
@@ -306,18 +323,9 @@ export default function CheckoutPage() {
               <span className="text-blue-600">KSh {total.toLocaleString()}</span>
             </div>
 
-            {selectedAddressObj && (
-              <div className="mt-6 pt-4 border-t border-gray-200">
-                <h3 className="font-semibold text-black mb-2">Deliver to:</h3>
-                <p className="text-gray-600 text-sm">{selectedAddressObj.full_name}</p>
-                <p className="text-gray-600 text-sm">{selectedAddressObj.street}</p>
-                <p className="text-gray-600 text-sm">{selectedAddressObj.town}, {selectedAddressObj.county}</p>
-              </div>
-            )}
-
             <button
               onClick={handlePlaceOrder}
-              disabled={processing || addresses.length === 0 || cartItems.length === 0}
+              disabled={processing || cartItems.length === 0}
               className={`w-full py-3 rounded-full mt-6 font-medium transition-all ${
                 processing 
                   ? 'bg-gray-400 cursor-not-allowed' 
@@ -326,6 +334,12 @@ export default function CheckoutPage() {
             >
               {processing ? 'Processing...' : `Place Order • KSh ${total.toLocaleString()}`}
             </button>
+
+            {isGuest && (
+              <p className="text-xs text-center text-gray-500 mt-3">
+                Continue as guest or <Link href="/login" className="text-blue-600">Login</Link>
+              </p>
+            )}
           </div>
         </div>
       </div>
