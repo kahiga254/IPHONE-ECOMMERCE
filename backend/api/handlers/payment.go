@@ -70,3 +70,22 @@ func QueryPaymentStatus(c *gin.Context) {
 
 	utils.SuccessResponse(c, http.StatusOK, "", payment)
 }
+
+// InitiateGuestPayment godoc
+// POST /api/v1/payments/mpesa/guest/stkpush
+func InitiateGuestPayment(c *gin.Context) {
+	var req models.InitiatePaymentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Pass empty userID for guests
+	payment, err := services.InitiatePayment("", req)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, "STK push sent to your phone, enter your M-Pesa PIN to complete payment", payment)
+}

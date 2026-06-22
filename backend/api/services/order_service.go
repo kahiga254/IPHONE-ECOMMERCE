@@ -6,6 +6,8 @@ import (
 	"backend/api/models"
 	"backend/api/repository"
 	"backend/pkg/database"
+
+	"github.com/google/uuid"
 )
 
 // shippingFee returns the shipping fee based on the county
@@ -178,4 +180,15 @@ func CancelOrder(orderID, userID string) error {
 	}
 
 	return repository.UpdateOrderStatus(orderID, "cancelled")
+}
+
+func CreateGuestOrder(req models.CreateGuestOrderRequest) (*models.Order, error) {
+	guestUserID := uuid.New().String() // plain UUID, no "guest-" prefix
+
+	order, err := repository.CreateGuestOrder(guestUserID, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create guest order: %w", err)
+	}
+
+	return order, nil
 }

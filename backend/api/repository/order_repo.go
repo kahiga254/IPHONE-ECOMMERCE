@@ -12,7 +12,7 @@ import (
 
 // GenerateOrderNumber creates a unique human readable order number
 func GenerateOrderNumber() string {
-	return fmt.Sprintf("ORD-%s-%d", time.Now().Format("20060102"), time.Now().UnixNano()%10000)
+	return fmt.Sprintf("ORD-%s-%d", time.Now().Format("20060102"), time.Now().UnixNano())
 }
 
 // CreateOrder inserts a new order and its items in a single transaction
@@ -114,7 +114,9 @@ func GetOrderByID(orderID, userID string) (*models.Order, error) {
 	}
 
 	order.Items = getOrderItems(order.ID)
-	order.Address = getOrderAddress(order.AddressID)
+	if order.AddressID != nil {
+		order.Address = getOrderAddress(*order.AddressID)
+	}
 
 	return &order, nil
 }
@@ -279,4 +281,110 @@ func getOrderAddress(addressID string) *models.Address {
 		return nil
 	}
 	return &a
+}
+
+// CreateGuestOrder inserts a new order for a guest user
+func CreateGuestOrder(guestUserID string, req models.CreateGuestOrderRequest) (*models.Order, error) {
+	tx, err := database.DB.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	orderNumber := GenerateOrderNumber()
+
+	// Build notes from guest info
+	notes := "Guest: " + req.GuestInfo.FullName +
+		" | Email: " + req.GuestInfo.Email +
+		" | Phone: " + req.GuestInfo.Phone +
+		" | Address: " + req.GuestInfo.Address +
+		", " + req.GuestInfo.City +
+		", " + req.GuestInfo.County
+
+	// Insert the order
+	var order models.Order
+	err = tx.QueryRow(`
+		INSERT INTO orders (user_id, order_number, status, subtotal, shipping_fee, total, notes)
+		VALUES ($1, $2, 'pending', $3, $4, $5, $6)
+		RETURNING id, user_id, order_number, status, subtotal, shipping_fee, discount, total, address_id, notes, created_at, updated_at`,
+		guestUserID, orderNumber, req.Subtotal, req.ShippingFee, req.Total, notes,
+	).Scan(
+		&order.ID, &order.UserID, &order.OrderNumber, &order.Status,
+		&order.Subtotal, &order.ShippingFee, &order.Discount, &order.Total,
+		&order.AddressID, &order.Notes, &order.CreatedAt, &order.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create guest order: %w", err)
+	}
+
+	// Insert each order item
+	for _, item := range req.Items {
+		// Fetch product_id, price and stock from product_variants
+		var productID string
+		var unitPrice float64
+		var stock int
+		err := tx.QueryRow(`
+			SELECT product_id, price, stock FROM product_variants WHERE id = $1`,
+			item.VariantID,
+		).Scan(&productID, &unitPrice, &stock)
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("variant %s not found", item.VariantID)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch variant: %w", err)
+		}
+
+		// Check stock
+		if stock < item.Quantity {
+			return nil, fmt.Errorf("insufficient stock for variant %s", item.VariantID)
+		}
+
+		totalPrice := unitPrice * float64(item.Quantity)
+
+		// Insert order item using product_id
+		_, err = tx.Exec(`
+			INSERT INTO order_items (order_id, product_id, quantity, price)
+			VALUES ($1, $2, $3, $4)`,
+			order.ID, productID, item.Quantity, totalPrice,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to insert order item: %w", err)
+		}
+
+		// Reduce stock on the variant
+		_, err = tx.Exec(`
+			UPDATE product_variants SET stock = stock - $1 WHERE id = $2`,
+			item.Quantity, item.VariantID,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to reduce stock: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit order: %w", err)
+	}
+
+	return &order, nil
+}
+
+// GetOrderByIDOnly fetches an order by ID only — used for guest payments
+func GetOrderByIDOnly(orderID string) (*models.Order, error) {
+	var order models.Order
+	err := database.DB.QueryRow(`
+		SELECT id, user_id, order_number, status, subtotal, shipping_fee,
+		       discount, total, address_id, notes, created_at, updated_at
+		FROM orders WHERE id = $1`, orderID,
+	).Scan(
+		&order.ID, &order.UserID, &order.OrderNumber, &order.Status,
+		&order.Subtotal, &order.ShippingFee, &order.Discount, &order.Total,
+		&order.AddressID, &order.Notes, &order.CreatedAt, &order.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get order: %w", err)
+	}
+	return &order, nil
 }

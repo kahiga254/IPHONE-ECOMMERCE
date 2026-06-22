@@ -10,8 +10,14 @@ import (
 
 // InitiatePayment creates a payment record and triggers an STK push to the user's phone
 func InitiatePayment(userID string, req models.InitiatePaymentRequest) (*models.Payment, error) {
-	// Fetch the order and confirm it belongs to the user
-	order, err := repository.GetOrderByID(req.OrderID, userID)
+	// Fetch order — guests have no userID so fetch by ID only
+	var order *models.Order
+	var err error
+	if userID == "" {
+		order, err = repository.GetOrderByIDOnly(req.OrderID)
+	} else {
+		order, err = repository.GetOrderByID(req.OrderID, userID)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch order: %w", err)
 	}
@@ -40,6 +46,7 @@ func InitiatePayment(userID string, req models.InitiatePaymentRequest) (*models.
 	}
 
 	// Create a pending payment record in the database
+	// For guests userID is empty string — payments table allows null user_id
 	payment, err := repository.CreatePayment(req.OrderID, userID, phone, order.Total)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payment record: %w", err)

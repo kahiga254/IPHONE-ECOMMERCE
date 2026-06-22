@@ -107,7 +107,8 @@ func main() {
 		user.DELETE("/reviews/:id", handlers.DeleteReview)
 	}
 
-	// ─── M-Pesa Callback — No Auth ────────────────────────────────────────────
+	v1.POST("/orders/guest", handlers.CreateGuestOrder)
+	v1.POST("/payments/mpesa/guest/stkpush", handlers.InitiateGuestPayment)
 	v1.POST("/payments/mpesa/callback", handlers.MpesaCallback)
 
 	// ─── Admin Routes ─────────────────────────────────────────────────────────
@@ -119,6 +120,7 @@ func main() {
 		admin.PUT("/products/:id", handlers.UpdateProduct)
 		admin.DELETE("/products/:id", handlers.DeleteProduct)
 		admin.PATCH("/products/:id/status", handlers.ToggleProductStatus)
+		admin.PUT("/variants/:id", handlers.UpdateVariant)
 
 		// Categories
 		admin.POST("/categories", handlers.CreateCategory)

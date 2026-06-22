@@ -11,7 +11,7 @@ type Order struct {
 	ShippingFee float64     `json:"shipping_fee"`
 	Discount    float64     `json:"discount"`
 	Total       float64     `json:"total"`
-	AddressID   string      `json:"address_id"`
+	AddressID   *string     `json:"address_id"`
 	Notes       string      `json:"notes,omitempty"`
 	Items       []OrderItem `json:"items,omitempty"`
 	Address     *Address    `json:"address,omitempty"`
@@ -50,4 +50,32 @@ type OrderFilterQuery struct {
 	Page   int    `form:"page,default=1"`
 	Limit  int    `form:"limit,default=10"`
 	Status string `form:"status"`
+}
+
+// CreateGuestOrderRequest is used when a guest (not logged in) places an order
+type CreateGuestOrderRequest struct {
+	Items         []OrderItemRequest `json:"items" binding:"required,min=1"`
+	Subtotal      float64            `json:"subtotal" binding:"required,gt=0"`
+	ShippingFee   float64            `json:"shipping_fee" binding:"gte=0"`
+	Total         float64            `json:"total" binding:"required,gt=0"`
+	PaymentMethod string             `json:"payment_method" binding:"required,oneof=mpesa cash"`
+	Phone         string             `json:"phone" binding:"required"`
+	GuestInfo     GuestInfo          `json:"guest_info" binding:"required"`
+}
+
+// GuestInfo holds guest customer details
+type GuestInfo struct {
+	FullName string `json:"full_name" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
+	Phone    string `json:"phone" binding:"required"`
+	Address  string `json:"address" binding:"required"`
+	City     string `json:"city"`
+	County   string `json:"county"`
+}
+
+// OrderItemRequest represents a single item in an order request
+type OrderItemRequest struct {
+	VariantID string  `json:"variant_id" binding:"required"`
+	Quantity  int     `json:"quantity" binding:"required,min=1"`
+	Price     float64 `json:"price" binding:"required,gt=0"`
 }
