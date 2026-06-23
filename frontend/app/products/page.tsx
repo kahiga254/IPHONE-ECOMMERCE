@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import api from '@/services/api';
 
+export const dynamic = 'force-dynamic';
+
 export default function ProductsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
