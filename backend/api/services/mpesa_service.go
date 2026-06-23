@@ -108,9 +108,8 @@ func normalizePhone(phone string) string {
 	phone = strings.ReplaceAll(phone, " ", "")
 
 	// Remove + if present
-	if strings.HasPrefix(phone, "+") {
-		phone = phone[1:]
-	}
+
+	phone = strings.TrimPrefix(phone, "+")
 
 	// If starts with 0, replace with 254
 	if strings.HasPrefix(phone, "0") {
