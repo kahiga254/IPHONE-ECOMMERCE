@@ -70,8 +70,8 @@ func InitiatePayment(userID string, req models.InitiatePaymentRequest) (*models.
 		return nil, fmt.Errorf("failed to update payment checkout ids: %w", err)
 	}
 
-	payment.CheckoutRequestID = stkResp.CheckoutRequestID
-	payment.MerchantRequestID = stkResp.MerchantRequestID
+	payment.CheckoutRequestID = &stkResp.CheckoutRequestID
+	payment.MerchantRequestID = &stkResp.MerchantRequestID
 
 	return payment, nil
 }
@@ -120,7 +120,6 @@ func HandleMpesaCallback(callback models.MpesaCallback) error {
 // QueryPaymentStatus manually queries Daraja for the payment status
 // This is used when the callback is delayed or never arrives
 func QueryPaymentStatus(orderID, userID string) (*models.Payment, error) {
-	// Fetch the payment record
 	payment, err := repository.GetPaymentByOrderID(orderID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch payment: %w", err)
@@ -129,33 +128,7 @@ func QueryPaymentStatus(orderID, userID string) (*models.Payment, error) {
 		return nil, fmt.Errorf("no payment found for this order")
 	}
 
-	// If already resolved no need to query Daraja
-	if payment.Status != models.PaymentStatusPending {
-		return payment, nil
-	}
-
-	// Query Daraja for the current status
-	queryResp, err := mpesa.QuerySTKStatus(payment.CheckoutRequestID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query payment status: %w", err)
-	}
-
-	// ResultCode 0 means success
-	if queryResp.ResultCode == "0" {
-		if err := repository.MarkPaymentSuccess(payment.CheckoutRequestID, "", queryResp); err != nil {
-			return nil, fmt.Errorf("failed to mark payment success: %w", err)
-		}
-		if err := repository.UpdateOrderStatus(payment.OrderID, "confirmed"); err != nil {
-			return nil, fmt.Errorf("failed to confirm order: %w", err)
-		}
-		payment.Status = models.PaymentStatusSuccess
-	} else {
-		if err := repository.MarkPaymentFailed(payment.CheckoutRequestID, queryResp.ResultDesc, queryResp); err != nil {
-			return nil, fmt.Errorf("failed to mark payment failed: %w", err)
-		}
-		payment.Status = models.PaymentStatusFailed
-	}
-
+	// Just return current DB status — callback will update it when Daraja responds
 	return payment, nil
 }
 

@@ -9,15 +9,22 @@ import (
 	"backend/pkg/database"
 )
 
-// CreatePayment inserts a new pending payment record into the database
 func CreatePayment(orderID, userID, phone string, amount float64) (*models.Payment, error) {
 	var payment models.Payment
+
+	// Use NULL for guest users (empty userID)
+	var uid interface{}
+	if userID == "" {
+		uid = nil
+	} else {
+		uid = userID
+	}
 
 	err := database.DB.QueryRow(`
 		INSERT INTO payments (order_id, user_id, amount, phone, provider, status)
 		VALUES ($1, $2, $3, $4, 'mpesa', 'pending')
 		RETURNING id, order_id, user_id, amount, phone, provider, status, created_at, updated_at`,
-		orderID, userID, amount, phone,
+		orderID, uid, amount, phone,
 	).Scan(
 		&payment.ID, &payment.OrderID, &payment.UserID, &payment.Amount,
 		&payment.Phone, &payment.Provider, &payment.Status,

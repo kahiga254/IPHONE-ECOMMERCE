@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 
 	"backend/api/models"
@@ -83,9 +84,27 @@ func InitiateGuestPayment(c *gin.Context) {
 	// Pass empty userID for guests
 	payment, err := services.InitiatePayment("", req)
 	if err != nil {
+		log.Printf("❌ InitiateGuestPayment error: %v", err)
 		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	utils.SuccessResponse(c, http.StatusOK, "STK push sent to your phone, enter your M-Pesa PIN to complete payment", payment)
+}
+
+func QueryGuestPaymentStatus(c *gin.Context) {
+	orderID := c.Param("order_id")
+	if orderID == "" {
+		utils.ErrorResponse(c, http.StatusBadRequest, "missing order id")
+		return
+	}
+
+	payment, err := services.QueryPaymentStatus(orderID, "")
+	if err != nil {
+		log.Printf("❌ QueryGuestPaymentStatus error: %v", err)
+		utils.ErrorResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, "", payment)
 }

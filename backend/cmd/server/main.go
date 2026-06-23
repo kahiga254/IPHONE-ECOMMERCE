@@ -110,6 +110,7 @@ func main() {
 	v1.POST("/orders/guest", handlers.CreateGuestOrder)
 	v1.POST("/payments/mpesa/guest/stkpush", handlers.InitiateGuestPayment)
 	v1.POST("/payments/mpesa/callback", handlers.MpesaCallback)
+	v1.GET("/payments/guest/:order_id/status", handlers.QueryGuestPaymentStatus)
 
 	// ─── Admin Routes ─────────────────────────────────────────────────────────
 	admin := v1.Group("/admin")

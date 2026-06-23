@@ -39,6 +39,7 @@ type AppConfig struct {
 	MPesaConsumerSecret string
 	MPesaPasskey        string
 	MPesaShortcode      string
+	MPesaStoreNumber    string
 	MPesaEnvironment    string
 	MPesaCallbackURL    string // ← ADD THIS LINE
 
@@ -86,6 +87,7 @@ func Load() {
 		MPesaConsumerSecret: getEnv("MPESA_CONSUMER_SECRET", ""),
 		MPesaPasskey:        getEnv("MPESA_PASSKEY", ""),
 		MPesaShortcode:      getEnv("MPESA_SHORTCODE", "174379"),
+		MPesaStoreNumber:    getEnv("MPESA_STORE_NUMBER", ""),
 		MPesaEnvironment:    getEnv("MPESA_ENVIRONMENT", "sandbox"),
 		MPesaCallbackURL:    getEnv("MPESA_CALLBACK_URL", "https://yourdomain.com/api/v1/payments/mpesa/callback"), // ADD THIS LINE
 

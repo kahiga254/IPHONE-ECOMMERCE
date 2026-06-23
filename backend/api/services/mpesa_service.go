@@ -2,10 +2,12 @@ package services
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"backend/config"
@@ -63,7 +65,7 @@ func (m *MpesaService) getAccessToken() (string, error) {
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.SetBasicAuth(m.consumerKey, m.consumerSecret)
@@ -71,13 +73,13 @@ func (m *MpesaService) getAccessToken() (string, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to get access token: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
 	var result struct {
@@ -85,16 +87,42 @@ func (m *MpesaService) getAccessToken() (string, error) {
 	}
 
 	if err := json.Unmarshal(body, &result); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if result.AccessToken == "" {
+		return "", fmt.Errorf("empty access token received")
 	}
 
 	return result.AccessToken, nil
 }
 
-func (m *MpesaService) generatePassword() string {
-	timestamp := time.Now().Format("20060102150405")
+func (m *MpesaService) generatePassword(timestamp string) string {
 	// Password = Base64(Shortcode + Passkey + Timestamp)
-	return timestamp // Will be properly encoded in the request
+	data := m.shortcode + m.passkey + timestamp
+	return base64.StdEncoding.EncodeToString([]byte(data))
+}
+
+func normalizePhone(phone string) string {
+	// Remove spaces
+	phone = strings.ReplaceAll(phone, " ", "")
+
+	// Remove + if present
+	if strings.HasPrefix(phone, "+") {
+		phone = phone[1:]
+	}
+
+	// If starts with 0, replace with 254
+	if strings.HasPrefix(phone, "0") {
+		phone = "254" + phone[1:]
+	}
+
+	// If starts with 7, add 254
+	if strings.HasPrefix(phone, "7") {
+		phone = "254" + phone
+	}
+
+	return phone
 }
 
 func (m *MpesaService) InitiateSTKPush(phoneNumber string, amount float64, accountRef string) (*STKPushResponse, error) {
@@ -104,11 +132,14 @@ func (m *MpesaService) InitiateSTKPush(phoneNumber string, amount float64, accou
 		return nil, fmt.Errorf("failed to get access token: %w", err)
 	}
 
-	timestamp := time.Now().Format("20060102150405")
-	password := m.shortcode + m.passkey + timestamp
+	// Normalize phone number
+	phone := normalizePhone(phoneNumber)
+	if len(phone) != 12 {
+		return nil, fmt.Errorf("invalid phone number format: %s (must be 12 digits)", phoneNumber)
+	}
 
-	// The actual password needs to be base64 encoded
-	// For now, we'll use a placeholder - this will be implemented properly
+	timestamp := time.Now().Format("20060102150405")
+	password := m.generatePassword(timestamp)
 
 	request := STKPushRequest{
 		BusinessShortCode: m.shortcode,
@@ -116,9 +147,9 @@ func (m *MpesaService) InitiateSTKPush(phoneNumber string, amount float64, accou
 		Timestamp:         timestamp,
 		TransactionType:   "CustomerPayBillOnline",
 		Amount:            fmt.Sprintf("%.0f", amount),
-		PartyA:            phoneNumber,
+		PartyA:            phone,
 		PartyB:            m.shortcode,
-		PhoneNumber:       phoneNumber,
+		PhoneNumber:       phone,
 		CallBackURL:       config.App.MPesaCallbackURL,
 		AccountReference:  accountRef,
 		TransactionDesc:   "Payment for order " + accountRef,
@@ -126,13 +157,13 @@ func (m *MpesaService) InitiateSTKPush(phoneNumber string, amount float64, accou
 
 	jsonData, err := json.Marshal(request)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
 	url := m.getBaseURL() + "/mpesa/stkpush/v1/processrequest"
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -141,18 +172,18 @@ func (m *MpesaService) InitiateSTKPush(phoneNumber string, amount float64, accou
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
 	var result STKPushResponse
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
 	if result.ResponseCode != "0" {

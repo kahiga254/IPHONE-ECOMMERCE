@@ -5,15 +5,15 @@ import "time"
 type Payment struct {
 	ID                string    `json:"id"`
 	OrderID           string    `json:"order_id"`
-	UserID            string    `json:"user_id"`
+	UserID            *string   `json:"user_id"`
 	Amount            float64   `json:"amount"`
 	Phone             string    `json:"phone"`
 	Provider          string    `json:"provider"`
-	MpesaReference    string    `json:"mpesa_reference,omitempty"`
-	CheckoutRequestID string    `json:"checkout_request_id,omitempty"`
-	MerchantRequestID string    `json:"merchant_request_id,omitempty"`
+	MpesaReference    *string   `json:"mpesa_reference,omitempty"`
+	CheckoutRequestID *string   `json:"checkout_request_id,omitempty"`
+	MerchantRequestID *string   `json:"merchant_request_id,omitempty"`
 	Status            string    `json:"status"`
-	FailureReason     string    `json:"failure_reason,omitempty"`
+	FailureReason     *string   `json:"failure_reason,omitempty"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }

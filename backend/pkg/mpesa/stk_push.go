@@ -43,10 +43,10 @@ func InitiateSTKPush(phone string, amount float64, orderNumber string) (*models.
 		BusinessShortCode: config.App.MPesaShortcode,
 		Password:          password,
 		Timestamp:         timestamp,
-		TransactionType:   "CustomerPayBillOnline",
-		Amount:            int(amount), // Daraja requires whole numbers
+		TransactionType:   "CustomerBuyGoodsOnline",
+		Amount:            int(amount),
 		PartyA:            phone,
-		PartyB:            config.App.MPesaShortcode,
+		PartyB:            config.App.MPesaStoreNumber,
 		PhoneNumber:       phone,
 		CallBackURL:       config.App.MPesaCallbackURL,
 		AccountReference:  orderNumber,
@@ -79,6 +79,9 @@ func InitiateSTKPush(phone string, amount float64, orderNumber string) (*models.
 	if err != nil {
 		return nil, fmt.Errorf("failed to read STK push response: %w", err)
 	}
+
+	fmt.Printf("📡 Daraja STK Response Status: %d\n", resp.StatusCode)
+	fmt.Printf("📡 Daraja STK Response Body: %s\n", string(body))
 
 	var stkResp models.StkPushResponse
 	if err := json.Unmarshal(body, &stkResp); err != nil {
