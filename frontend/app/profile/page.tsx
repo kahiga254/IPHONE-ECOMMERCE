@@ -225,7 +225,7 @@ export default function ProfilePage() {
             <div className="bg-white rounded-xl shadow-md p-6">
               <h3 className="font-semibold text-black mb-3">Security</h3>
               <button
-                onClick={() => toast.info('Password reset feature coming soon')}
+                onClick={() => toast('Password reset feature coming soon')}
                 className="text-blue-600 hover:underline text-sm"
               >
                 Change Password →
