@@ -105,6 +105,7 @@ export default function ProductDetailPage() {
     }
     
     localStorage.setItem('cart', JSON.stringify(cart));
+    window.dispatchEvent(new Event('cartUpdated'));
     
     // Reset button state after a short delay
     setTimeout(() => {

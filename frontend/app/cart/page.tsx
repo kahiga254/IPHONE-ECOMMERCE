@@ -42,6 +42,7 @@ export default function CartPage() {
 
   const saveCart = (items: CartItem[]) => {
     localStorage.setItem('cart', JSON.stringify(items));
+    window.dispatchEvent(new Event('cartUpdated'));
     setCartItems(items);
   };
 

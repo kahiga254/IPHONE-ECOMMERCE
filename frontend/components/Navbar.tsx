@@ -11,8 +11,9 @@ export default function Navbar() {
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
+  const [cartCount, setCartCount] = useState(0);
   
-  useEffect(() => {
+ useEffect(() => {
     setMounted(true);
     const token = localStorage.getItem('access_token');
     const userStr = localStorage.getItem('user');
@@ -27,6 +28,24 @@ export default function Navbar() {
         setIsAdmin(false);
       }
     }
+
+    // Cart count
+    const updateCartCount = () => {
+      const savedCart = localStorage.getItem('cart');
+      console.log('🛒 Cart updated, raw:', savedCart);
+      if (savedCart) {
+        const items = JSON.parse(savedCart);
+        const count = items.reduce((sum: number, item: any) => sum + item.quantity, 0);
+        console.log('🛒 Cart count:', count);
+        setCartCount(count);
+      } else {
+        setCartCount(0);
+      }
+    };
+
+    updateCartCount();
+    window.addEventListener('cartUpdated', updateCartCount);
+    return () => window.removeEventListener('cartUpdated', updateCartCount);
   }, []);
 
   const handleLogout = () => {
@@ -94,7 +113,14 @@ export default function Navbar() {
             {isLoggedIn && (
               <Link href="/wishlist" className="text-gray-800 hover:text-blue-600">Wishlist</Link>
             )}
-            <Link href="/cart" className="text-gray-800 hover:text-blue-600">Cart</Link>
+            <Link href="/cart" className="relative text-gray-800 hover:text-blue-600">
+              🛒 Cart
+              {cartCount > 0 && (
+                <span className="absolute -top-2 -right-3 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                  {cartCount}
+                </span>
+              )}
+            </Link>
             {isLoggedIn && (
               <Link href="/profile" className="text-gray-800 hover:text-blue-600">Profile</Link>
             )}
@@ -153,7 +179,14 @@ export default function Navbar() {
               {isLoggedIn && (
                 <Link href="/wishlist" className="text-gray-800 hover:text-blue-600">Wishlist</Link>
               )}
-              <Link href="/cart" className="text-gray-800 hover:text-blue-600">Cart</Link>
+              <Link href="/cart" className="relative inline-flex items-center gap-1 text-gray-800 hover:text-blue-600">
+                🛒 Cart
+                {cartCount > 0 && (
+                  <span className="bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                    {cartCount}
+                  </span>
+                )}
+              </Link>
               {isLoggedIn && (
                 <Link href="/profile" className="text-gray-800 hover:text-blue-600">Profile</Link>
               )}
