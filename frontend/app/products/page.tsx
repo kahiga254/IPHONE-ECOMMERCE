@@ -1,14 +1,10 @@
 'use client';
-export const dynamic = 'force-dynamic';
-
 
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import api from '@/services/api';
-
-
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -70,7 +66,6 @@ export default function ProductsPage() {
       if (filters.order) params.append('order', filters.order);
       
       const response = await api.get(`/products?${params.toString()}`);
-      console.log('Products data:', response.data.data.data);
       setProducts(response.data.data.data || []);
       setPagination({
         ...pagination,
@@ -235,7 +230,6 @@ export default function ProductsPage() {
                                 alt={product.name}
                                 className="w-full h-48 object-contain"
                                 onError={(e) => {
-                                  console.error('Image load error:', image);
                                   (e.target as HTMLImageElement).style.display = 'none';
                                 }}
                               />
