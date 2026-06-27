@@ -202,7 +202,7 @@ export default function Home() {
       </section>
 
       {/* Newsletter */}
-      <section className="py-12 bg-black text-white">
+      <section className="py-12 pb-24 md:pb-12 bg-black text-white">
         <div className="max-w-2xl mx-auto px-4 text-center">
           <h2 className="text-2xl font-bold mb-2">Stay Updated</h2>
           <p className="text-gray-400 mb-4">Get notified about new arrivals and exclusive offers</p>
