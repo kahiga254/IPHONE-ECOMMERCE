@@ -1,13 +1,9 @@
 'use client';
-export const dynamic = 'force-dynamic';
-
-
-
-
 
 import { useEffect, useState } from 'react';
 import api from '@/services/api';
 import toast from 'react-hot-toast';
+import Link from 'next/link';
 
 interface Stats {
   totalProducts: number;
@@ -59,54 +55,64 @@ export default function AdminDashboard() {
   };
 
   const statCards = [
-    { label: 'Total Products', value: stats.totalProducts, color: 'bg-blue-500' },
-    { label: 'Total Orders', value: stats.totalOrders, color: 'bg-green-500' },
-    { label: 'Total Users', value: stats.totalUsers, color: 'bg-purple-500' },
-    { label: 'Revenue', value: `KSh ${stats.totalRevenue.toLocaleString()}`, color: 'bg-yellow-500' },
+    { label: 'Total Products', value: stats.totalProducts, color: 'bg-blue-50 border-blue-200', textColor: 'text-blue-700' },
+    { label: 'Total Orders', value: stats.totalOrders, color: 'bg-green-50 border-green-200', textColor: 'text-green-700' },
+    { label: 'Total Users', value: stats.totalUsers, color: 'bg-purple-50 border-purple-200', textColor: 'text-purple-700' },
+    { label: 'Revenue', value: `KSh ${stats.totalRevenue.toLocaleString()}`, color: 'bg-yellow-50 border-yellow-200', textColor: 'text-yellow-700' },
   ];
 
   if (loading) {
-    return <div className="text-center py-16 text-black">Loading dashboard...</div>;
+    return <div className="text-center py-8 md:py-16 text-black">Loading dashboard...</div>;
   }
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-black mb-8">Dashboard</h1>
+      <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-black mb-4 md:mb-8">Dashboard</h1>
 
-      {/* Stats Cards */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {/* Stats Cards - Mobile responsive grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-4 md:mb-8">
         {statCards.map((card, idx) => (
-          <div key={idx} className="bg-white rounded-xl shadow-md p-6">
-            <p className="text-gray-600 text-sm mb-2">{card.label}</p>
-            <p className="text-2xl font-bold text-black">{card.value}</p>
+          <div key={idx} className={`${card.color} rounded-xl shadow-sm p-3 md:p-6 border`}>
+            <p className="text-xs md:text-sm text-gray-600 mb-1">{card.label}</p>
+            <p className={`text-base md:text-2xl font-bold ${card.textColor}`}>{card.value}</p>
           </div>
         ))}
       </div>
 
-      {/* Recent Orders */}
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h2 className="text-xl font-bold text-black mb-4">Recent Orders</h2>
+      {/* Recent Orders - Responsive */}
+      <div className="bg-white rounded-xl shadow-md p-4 md:p-6 overflow-x-auto">
+        <h2 className="text-base md:text-xl font-bold text-black mb-3 md:mb-4">Recent Orders</h2>
         {recentOrders.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">No orders yet</p>
+          <p className="text-gray-500 text-center py-4 md:py-8">No orders yet</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto -mx-4 md:mx-0">
+            <table className="w-full text-sm md:text-base">
               <thead className="border-b border-gray-200">
                 <tr className="text-left">
-                  <th className="pb-3 text-gray-600 font-medium">Order #</th>
-                  <th className="pb-3 text-gray-600 font-medium">Date</th>
-                  <th className="pb-3 text-gray-600 font-medium">Total</th>
-                  <th className="pb-3 text-gray-600 font-medium">Status</th>
+                  <th className="pb-2 md:pb-3 px-2 md:px-0 text-gray-600 font-medium">Order #</th>
+                  <th className="pb-2 md:pb-3 px-2 md:px-0 text-gray-600 font-medium hidden sm:table-cell">Date</th>
+                  <th className="pb-2 md:pb-3 px-2 md:px-0 text-gray-600 font-medium text-right">Total</th>
+                  <th className="pb-2 md:pb-3 px-2 md:px-0 text-gray-600 font-medium text-right">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {recentOrders.map((order: any) => (
                   <tr key={order.id} className="border-b border-gray-100">
-                    <td className="py-3 text-black">{order.order_number}</td>
-                    <td className="py-3 text-gray-600">{new Date(order.created_at).toLocaleDateString()}</td>
-                    <td className="py-3 text-black">KSh {order.total_amount?.toLocaleString()}</td>
-                    <td className="py-3">
-                      <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">
+                    <td className="py-2 md:py-3 px-2 md:px-0 text-black font-mono text-xs md:text-sm">{order.order_number}</td>
+                    <td className="py-2 md:py-3 px-2 md:px-0 text-gray-600 text-xs md:text-sm hidden sm:table-cell">
+                      {new Date(order.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="py-2 md:py-3 px-2 md:px-0 text-black text-right text-sm md:text-base">
+                      KSh {order.total_amount?.toLocaleString()}
+                    </td>
+                    <td className="py-2 md:py-3 px-2 md:px-0 text-right">
+                      <span className={`px-2 py-0.5 md:px-3 md:py-1 rounded text-xs font-medium ${
+                        order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        order.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                        order.status === 'shipped' ? 'bg-purple-100 text-purple-800' :
+                        order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
                         {order.status}
                       </span>
                     </td>
