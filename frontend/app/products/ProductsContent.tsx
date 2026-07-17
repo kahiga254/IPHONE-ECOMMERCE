@@ -5,6 +5,11 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import api from '@/services/api';
 
+const optimizeCloudinaryUrl = (url: string, width = 400, height = 400) => {
+  if (!url || !url.includes('cloudinary.com')) return url;
+  return url.replace('/upload/', `/upload/w_${width},h_${height},c_pad,q_auto,f_auto/`);
+};
+
 export default function ProductsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -192,7 +197,15 @@ export default function ProductsContent() {
                       <div className="p-4">
                         <div className="bg-gray-100 rounded-lg h-48 flex items-center justify-center mb-3">
                           {image ? (
-                            <img src={image} alt={product.name} className="w-full h-48 object-contain" />
+                            <img
+                              src={optimizeCloudinaryUrl(image, 400, 192)}
+                              alt={product.name}
+                              className="w-full h-48 object-contain"
+                              loading="lazy"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
                           ) : (
                             <div className="text-6xl">📱</div>
                           )}

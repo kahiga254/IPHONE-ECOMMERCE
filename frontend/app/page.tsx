@@ -1,11 +1,15 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import { useEffect, useState } from 'react';
 import api from '@/services/api';
+
+const optimizeCloudinaryUrl = (url: string, width = 400, height = 400) => {
+  if (!url || !url.includes('cloudinary.com')) return url;
+  return url.replace('/upload/', `/upload/w_${width},h_${height},c_pad,q_auto,f_auto/`);
+};
 
 export default function Home() {
   const [products, setProducts] = useState([]);
@@ -41,7 +45,6 @@ export default function Home() {
     return null;
   };
 
-  // Define the categories we want to display in order
   const displayCategories = [
     { name: 'iPhones', icon: '📱', slug: 'iphones' },
     { name: 'Apple Accessories', icon: '🎧', slug: 'apple-accessories' },
@@ -63,12 +66,8 @@ export default function Home() {
               <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-4">
                 <span className="text-blue-500">NIFNOC</span> iMobile
               </h1>
-              <p className="text-xl md:text-2xl mb-2 text-gray-300">
-                ONLY NEW iPHONES
-              </p>
-              <p className="text-lg mb-6 text-gray-400">
-                Buy the latest iPhones at the best prices in Kenya
-              </p>
+              <p className="text-xl md:text-2xl mb-2 text-gray-300">ONLY NEW iPHONES</p>
+              <p className="text-lg mb-6 text-gray-400">Buy the latest iPhones at the best prices in Kenya</p>
               <div className="flex flex-wrap gap-4">
                 <Link href="/products" className="bg-blue-600 text-white px-8 py-3 rounded-full font-medium hover:bg-blue-700 transition-all inline-block">
                   Shop Now →
@@ -83,9 +82,7 @@ export default function Home() {
                 <div className="text-7xl mb-4">📱</div>
                 <p className="text-2xl font-bold">Latest iPhones</p>
                 <p className="text-gray-200">Up to 12 Months Warranty</p>
-                <div className="mt-4 inline-block bg-white/20 px-6 py-2 rounded-full">
-                  🔥 New Arrivals
-                </div>
+                <div className="mt-4 inline-block bg-white/20 px-6 py-2 rounded-full">🔥 New Arrivals</div>
               </div>
             </div>
           </div>
@@ -97,7 +94,6 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-black text-center mb-4">Shop by Category</h2>
           <p className="text-center text-gray-500 mb-10">Find exactly what you're looking for</p>
-          
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {displayCategories.map((cat) => (
               <Link
@@ -105,13 +101,9 @@ export default function Home() {
                 href={`/products?category=${cat.slug}`}
                 className="bg-white rounded-2xl shadow-md p-8 text-center hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-gray-100 group"
               >
-                <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">
-                  {cat.icon}
-                </div>
+                <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">{cat.icon}</div>
                 <h3 className="font-semibold text-black text-lg">{cat.name}</h3>
-                <p className="text-sm text-blue-600 mt-2 group-hover:underline">
-                  Shop now →
-                </p>
+                <p className="text-sm text-blue-600 mt-2 group-hover:underline">Shop now →</p>
               </Link>
             ))}
           </div>
@@ -123,11 +115,8 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-black">Featured Products</h2>
-            <Link href="/products" className="text-blue-600 hover:underline text-sm">
-              View All →
-            </Link>
+            <Link href="/products" className="text-blue-600 hover:underline text-sm">View All →</Link>
           </div>
-          
           {loading ? (
             <div className="text-center py-12 text-black">Loading products...</div>
           ) : featuredProducts.length === 0 ? (
@@ -142,12 +131,12 @@ export default function Home() {
                       <div className="bg-gray-100 rounded-lg h-40 flex items-center justify-center mb-3">
                         {image ? (
                           <img
-                            src={image}
+                            src={optimizeCloudinaryUrl(image, 300, 160)}
                             alt={product.name}
                             className="w-full h-40 object-contain"
+                            loading="lazy"
                             onError={(e) => {
-                              (e.target as HTMLImageElement).src = '';
-                              (e.target as HTMLImageElement).alt = 'No image';
+                              (e.target as HTMLImageElement).style.display = 'none';
                             }}
                           />
                         ) : (
@@ -155,13 +144,8 @@ export default function Home() {
                         )}
                       </div>
                       <h3 className="font-semibold text-black text-sm truncate">{product.name}</h3>
-                      <p className="text-blue-600 font-bold text-base mt-1">
-                        KSh {product.base_price?.toLocaleString()}
-                      </p>
-                      <Link
-                        href={`/products/${product.slug}`}
-                        className="block w-full bg-black text-white text-center py-2 rounded-full mt-3 text-sm hover:bg-gray-800 transition"
-                      >
+                      <p className="text-blue-600 font-bold text-base mt-1">KSh {product.base_price?.toLocaleString()}</p>
+                      <Link href={`/products/${product.slug}`} className="block w-full bg-black text-white text-center py-2 rounded-full mt-3 text-sm hover:bg-gray-800 transition">
                         Buy Now
                       </Link>
                     </div>
