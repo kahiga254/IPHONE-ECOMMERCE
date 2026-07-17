@@ -66,33 +66,12 @@ func GetAllProducts(q models.ProductFilterQuery) ([]models.Product, int, error) 
 	offset := (q.Page - 1) * q.Limit
 	args = append(args, q.Limit, offset)
 
-	// Get products with variants in a single query using json_agg
+	// Get products
 	query := fmt.Sprintf(`
-		SELECT 
-			p.id, p.name, p.slug, p.description, p.category_id, p.base_price,
-			p.discount_price, p.is_featured, p.is_active, p.meta_title,
-			p.meta_description, p.created_at, p.updated_at,
-			COALESCE(AVG(r.rating), 0) AS avg_rating,
-			COALESCE(
-				(
-					SELECT json_agg(
-						json_build_object(
-							'id', pv.id,
-							'product_id', pv.product_id,
-							'sku', pv.sku,
-							'color', pv.color,
-							'storage', pv.storage,
-							'price', pv.price,
-							'stock', pv.stock,
-							'images', pv.images,
-							'created_at', pv.created_at
-						)
-					)
-					FROM product_variants pv
-					WHERE pv.product_id = p.id
-				),
-				'[]'::json
-			) as variants
+		SELECT p.id, p.name, p.slug, p.description, p.category_id, p.base_price,
+		       p.discount_price, p.is_featured, p.is_active, p.meta_title,
+		       p.meta_description, p.created_at, p.updated_at,
+		       COALESCE(AVG(r.rating), 0) AS avg_rating
 		FROM products p
 		LEFT JOIN categories c ON p.category_id = c.id
 		LEFT JOIN reviews r ON r.product_id = p.id AND r.is_approved = TRUE
@@ -110,30 +89,75 @@ func GetAllProducts(q models.ProductFilterQuery) ([]models.Product, int, error) 
 	defer rows.Close()
 
 	products := []models.Product{}
+	productIDs := []string{}
+
 	for rows.Next() {
 		var p models.Product
-		var variantsJSON []byte
-
 		err := rows.Scan(
 			&p.ID, &p.Name, &p.Slug, &p.Description, &p.CategoryID,
 			&p.BasePrice, &p.DiscountPrice, &p.IsFeatured, &p.IsActive,
 			&p.MetaTitle, &p.MetaDescription, &p.CreatedAt, &p.UpdatedAt,
 			&p.AvgRating,
-			&variantsJSON,
 		)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to scan product: %w", err)
 		}
+		products = append(products, p)
+		productIDs = append(productIDs, p.ID)
+	}
 
-		// Parse variants from JSON
-		if len(variantsJSON) > 0 && string(variantsJSON) != "null" && string(variantsJSON) != "[]" {
-			var variants []models.Variant
-			if err := json.Unmarshal(variantsJSON, &variants); err == nil {
-				p.Variants = variants
+	// Fetch variants for all products in a single query
+	if len(productIDs) > 0 {
+		variantMap := make(map[string][]models.Variant)
+		
+		// Build query with placeholders for all product IDs
+		placeholders := ""
+		for i, id := range productIDs {
+			if i > 0 {
+				placeholders += ","
+			}
+			placeholders += fmt.Sprintf("'%s'", id)
+		}
+		
+		variantQuery := fmt.Sprintf(`
+			SELECT product_id, id, sku, color, storage, price, stock, images, created_at
+			FROM product_variants
+			WHERE product_id IN (%s)
+			ORDER BY product_id, created_at ASC
+		`, placeholders)
+		
+		variantRows, err := database.DB.Query(variantQuery)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to fetch variants: %w", err)
+		}
+		defer variantRows.Close()
+		
+		for variantRows.Next() {
+			var v models.Variant
+			var productID string
+			var imagesJSON []byte
+			
+			err := variantRows.Scan(
+				&productID, &v.ID, &v.SKU, &v.Color, &v.Storage,
+				&v.Price, &v.Stock, &imagesJSON, &v.CreatedAt,
+			)
+			if err != nil {
+				continue
+			}
+			
+			if len(imagesJSON) > 0 {
+				json.Unmarshal(imagesJSON, &v.Images)
+			}
+			
+			variantMap[productID] = append(variantMap[productID], v)
+		}
+		
+		// Assign variants to products
+		for i := range products {
+			if variants, ok := variantMap[products[i].ID]; ok {
+				products[i].Variants = variants
 			}
 		}
-
-		products = append(products, p)
 	}
 
 	return products, total, nil
@@ -142,34 +166,12 @@ func GetAllProducts(q models.ProductFilterQuery) ([]models.Product, int, error) 
 // GetProductBySlug fetches a single product with all its variants, specs and reviews
 func GetProductBySlug(slug string) (*models.Product, error) {
 	var p models.Product
-	var variantsJSON []byte
 
 	err := database.DB.QueryRow(`
-		SELECT 
-			p.id, p.name, p.slug, p.description, p.category_id, p.base_price,
-			p.discount_price, p.is_featured, p.is_active, p.meta_title,
-			p.meta_description, p.created_at, p.updated_at,
-			COALESCE(AVG(r.rating), 0) AS avg_rating,
-			COALESCE(
-				(
-					SELECT json_agg(
-						json_build_object(
-							'id', pv.id,
-							'product_id', pv.product_id,
-							'sku', pv.sku,
-							'color', pv.color,
-							'storage', pv.storage,
-							'price', pv.price,
-							'stock', pv.stock,
-							'images', pv.images,
-							'created_at', pv.created_at
-						)
-					)
-					FROM product_variants pv
-					WHERE pv.product_id = p.id
-				),
-				'[]'::json
-			) as variants
+		SELECT p.id, p.name, p.slug, p.description, p.category_id, p.base_price,
+		       p.discount_price, p.is_featured, p.is_active, p.meta_title,
+		       p.meta_description, p.created_at, p.updated_at,
+		       COALESCE(AVG(r.rating), 0) AS avg_rating
 		FROM products p
 		LEFT JOIN reviews r ON r.product_id = p.id AND r.is_approved = TRUE
 		WHERE p.slug = $1 AND p.is_active = TRUE
@@ -179,7 +181,6 @@ func GetProductBySlug(slug string) (*models.Product, error) {
 		&p.BasePrice, &p.DiscountPrice, &p.IsFeatured, &p.IsActive,
 		&p.MetaTitle, &p.MetaDescription, &p.CreatedAt, &p.UpdatedAt,
 		&p.AvgRating,
-		&variantsJSON,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -188,14 +189,7 @@ func GetProductBySlug(slug string) (*models.Product, error) {
 		return nil, fmt.Errorf("failed to get product: %w", err)
 	}
 
-	// Parse variants from JSON
-	if len(variantsJSON) > 0 && string(variantsJSON) != "null" && string(variantsJSON) != "[]" {
-		var variants []models.Variant
-		if err := json.Unmarshal(variantsJSON, &variants); err == nil {
-			p.Variants = variants
-		}
-	}
-
+	p.Variants = getVariantsByProductID(p.ID)
 	p.Specs = getSpecsByProductID(p.ID)
 
 	return &p, nil
@@ -301,6 +295,38 @@ func DeleteProduct(id string) error {
 }
 
 // ─── Private Helpers ──────────────────────────────────────────────────────────
+
+// getVariantsByProductID fetches all variants for a given product
+func getVariantsByProductID(productID string) []models.Variant {
+	rows, err := database.DB.Query(`
+		SELECT id, product_id, sku, color, storage, price, stock, images, created_at
+		FROM product_variants
+		WHERE product_id = $1
+		ORDER BY created_at ASC`, productID,
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	variants := []models.Variant{}
+	for rows.Next() {
+		var v models.Variant
+		var imagesJSON []byte
+		err := rows.Scan(
+			&v.ID, &v.ProductID, &v.SKU, &v.Color, &v.Storage,
+			&v.Price, &v.Stock, &imagesJSON, &v.CreatedAt,
+		)
+		if err != nil {
+			continue
+		}
+		if len(imagesJSON) > 0 {
+			json.Unmarshal(imagesJSON, &v.Images)
+		}
+		variants = append(variants, v)
+	}
+	return variants
+}
 
 // getSpecsByProductID fetches all specs for a given product
 func getSpecsByProductID(productID string) []models.Spec {
