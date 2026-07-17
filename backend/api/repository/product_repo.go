@@ -88,6 +88,8 @@ func GetAllProducts(q models.ProductFilterQuery) ([]models.Product, int, error) 
 	defer rows.Close()
 
 	products := []models.Product{}
+	productIDs := []string{}
+
 	for rows.Next() {
 		var p models.Product
 		err := rows.Scan(
@@ -99,10 +101,18 @@ func GetAllProducts(q models.ProductFilterQuery) ([]models.Product, int, error) 
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to scan product: %w", err)
 		}
-		p.Variants = getVariantsByProductID(p.ID)
 		products = append(products, p)
+		productIDs = append(productIDs, p.ID)
 	}
-
+	if len(productIDs) > 0 {
+		variantMap := make(map[string][]models.Variant)
+		for _, id := range productIDs {
+			variantMap[id] = getVariantsByProductID(id)
+		}
+		for i := range products {
+			products[i].Variants = variantMap[products[i].ID]
+		}
+	}
 	return products, total, nil
 }
 
@@ -243,7 +253,9 @@ func DeleteProduct(id string) error {
 func getVariantsByProductID(productID string) []models.Variant {
 	rows, err := database.DB.Query(`
 		SELECT id, product_id, sku, color, storage, price, stock, images, created_at
-		FROM product_variants WHERE product_id = $1`, productID,
+		FROM product_variants
+		WHERE product_id = $1
+		ORDER BY created_at ASC`, productID,
 	)
 	if err != nil {
 		return nil
@@ -254,10 +266,13 @@ func getVariantsByProductID(productID string) []models.Variant {
 	for rows.Next() {
 		var v models.Variant
 		var imagesJSON []byte
-		rows.Scan(
-			&v.ID, &v.ProductID, &v.SKU, &v.Color,
-			&v.Storage, &v.Price, &v.Stock, &imagesJSON, &v.CreatedAt,
+		err := rows.Scan(
+			&v.ID, &v.ProductID, &v.SKU, &v.Color, &v.Storage,
+			&v.Price, &v.Stock, &imagesJSON, &v.CreatedAt,
 		)
+		if err != nil {
+			continue
+		}
 		json.Unmarshal(imagesJSON, &v.Images)
 		variants = append(variants, v)
 	}
