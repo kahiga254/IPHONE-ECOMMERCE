@@ -32,6 +32,10 @@ func main() {
 	r.Use(middleware.CORS())
 	r.Use(gin.Recovery()) // recovers from panics and returns 500
 
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
 	// ─── API Version 1 ────────────────────────────────────────────────────────
 	v1 := r.Group("/api/v1")
 
